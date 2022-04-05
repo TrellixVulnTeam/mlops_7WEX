@@ -1,1 +1,1 @@
-# flask_ML
+# Definition Kubernetes pipeline 
