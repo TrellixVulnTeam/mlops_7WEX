@@ -7,10 +7,11 @@ import timm
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from util import seed_everything, MetricMonitor, build_dataset, build_optimizer
 import wandb
+
 class ConvNeXt(nn.Module):
     def __init__(self, num_classes, pretrained=True):
         super(ConvNeXt, self).__init__()
-        self.model = timm.create_model('convnext_tiny', pretrained=pretrained)  # timm 라이브러리에서 pretrained model 가져옴
+        self.model = timm.create_model('convnext_tiny', pretrained=pretrained)
         self.model.head.fc = nn.Linear(self.model.head.fc.in_features, num_classes, bias=True)
     def forward(self, x):
         return self.model(x)
@@ -55,7 +56,7 @@ def val_epoch(val_loader, epoch, model, criterion, device):
         wandb.log({"VAL EPOCH LOSS": val_loss / len(val_loader.dataset)})
     return accuracy
 def main(hyperparameters=None):
-    wandb.init(project='surface-classification', config=hyperparameters)
+    wandb.init(project='dandc-classification', config=hyperparameters)
     config = wandb.config
     epochs = 1
     # read mean std values
@@ -98,7 +99,7 @@ if __name__ == '__main__':
         device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"DEVICE is {device}")
     seed_everything()
-    wandb.login(key='write private key')
+    wandb.login(key='e7ea491763e9801fcffd9d259dbadcf4ae978e8b')
     hyperparameters = configure()
-    sweep_id = wandb.sweep(hyperparameters, project='surface-classification')
+    sweep_id = wandb.sweep(hyperparameters, project='dandc-classification')
     wandb.agent(sweep_id, main, count=10)  # count: 실험 횟수

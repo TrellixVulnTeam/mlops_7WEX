@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 def split_dataset(data_path):
-    splitfolders.ratio(f'{data_path}/surface', output=f'{data_path}/dataset', seed=42, ratio=(0.7, 0.15, 0.15))
+    splitfolders.ratio(f'{data_path}/dandc', output=f'{data_path}/dataset', seed=42, ratio=(0.7, 0.15, 0.15))
     # print data amount
     data = ['train','val','test']
-    label = ['negative','positive']
+    label = ['dogs','cats']
     for i in data:
         for j in label:
             count = len(os.listdir(f'{data_path}/dataset/{i}/{j}'))
@@ -22,7 +22,7 @@ def get_mean_std(data_path, img_size):
             self.transforms = transforms
         def __call__(self, img, *args, **kwargs):
             return self.transforms(image=np.array(img))['image']
-    dataset = datasets.ImageFolder(f'{data_path}/surface', transform=Transforms(transforms=A.Compose([A.Resize(img_size , img_size), ToTensorV2()])))
+    dataset = datasets.ImageFolder(f'{data_path}/dandc', transform=Transforms(transforms=A.Compose([A.Resize(img_size , img_size), ToTensorV2()])))
     loader = DataLoader(dataset, batch_size=10, num_workers=0, shuffle=False)
     mean = 0.0
     for images, _ in loader:

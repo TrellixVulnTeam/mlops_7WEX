@@ -1,0 +1,164 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: dandc-crack-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.9, pipelines.kubeflow.org/pipeline_compilation_time: '2022-04-06T23:37:56.289232',
+    pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"name": "mode_hyp_train_test",
+      "type": "String"}, {"name": "preprocess_yes_no", "type": "String"}, {"name":
+      "model_path", "type": "String"}, {"name": "device", "type": "String"}], "name":
+      "DandC Crack Pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.9}
+spec:
+  entrypoint: dandc-crack-pipeline
+  templates:
+  - name: condition-1
+    dag:
+      tasks:
+      - {name: preprocess-data, template: preprocess-data}
+  - name: condition-2
+    inputs:
+      parameters:
+      - {name: device}
+    dag:
+      tasks:
+      - name: hyperparameter-tuning
+        template: hyperparameter-tuning
+        arguments:
+          parameters:
+          - {name: device, value: '{{inputs.parameters.device}}'}
+  - name: condition-3
+    inputs:
+      parameters:
+      - {name: device}
+    dag:
+      tasks:
+      - name: train-model
+        template: train-model
+        arguments:
+          parameters:
+          - {name: device, value: '{{inputs.parameters.device}}'}
+  - name: condition-4
+    inputs:
+      parameters:
+      - {name: device}
+      - {name: model_path}
+    dag:
+      tasks:
+      - name: test-model
+        template: test-model
+        arguments:
+          parameters:
+          - {name: device, value: '{{inputs.parameters.device}}'}
+          - {name: model_path, value: '{{inputs.parameters.model_path}}'}
+  - name: dandc-crack-pipeline
+    inputs:
+      parameters:
+      - {name: device}
+      - {name: mode_hyp_train_test}
+      - {name: model_path}
+      - {name: preprocess_yes_no}
+    dag:
+      tasks:
+      - {name: condition-1, template: condition-1, when: '"{{inputs.parameters.preprocess_yes_no}}"
+          == "yes"'}
+      - name: condition-2
+        template: condition-2
+        when: '"{{inputs.parameters.mode_hyp_train_test}}" == "hyp"'
+        dependencies: [condition-1]
+        arguments:
+          parameters:
+          - {name: device, value: '{{inputs.parameters.device}}'}
+      - name: condition-3
+        template: condition-3
+        when: '"{{inputs.parameters.mode_hyp_train_test}}" == "train"'
+        dependencies: [condition-1]
+        arguments:
+          parameters:
+          - {name: device, value: '{{inputs.parameters.device}}'}
+      - name: condition-4
+        template: condition-4
+        when: '"{{inputs.parameters.mode_hyp_train_test}}" == "test"'
+        dependencies: [condition-1]
+        arguments:
+          parameters:
+          - {name: device, value: '{{inputs.parameters.device}}'}
+          - {name: model_path, value: '{{inputs.parameters.model_path}}'}
+  - name: hyperparameter-tuning
+    container:
+      args: [--data-path, /home/jovyan, --device, '{{inputs.parameters.device}}']
+      image: kaejong/hyp:0.1
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+    inputs:
+      parameters:
+      - {name: device}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: workspace-dandc-v1}
+  - name: preprocess-data
+    container:
+      args: [--data-path, /home/jovyan, --img-size, '224']
+      image: kaejong/preprocess:0.1
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: workspace-dandc-v1}
+  - name: test-model
+    container:
+      args: [--data-path, /home/jovyan, --img-size, '224', --model-path, '{{inputs.parameters.model_path}}',
+        --device, '{{inputs.parameters.device}}']
+      image: kaejong/test:0.2
+      resources:
+        limits: {nvidia.com/gpu: 4}
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+    inputs:
+      parameters:
+      - {name: device}
+      - {name: model_path}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: workspace-dandc-v1}
+  - name: train-model
+    container:
+      args: [--data-path, /home/jovyan, --img-size, '224', --model-name, dandc-ConvNeXt-T,
+        --device, '{{inputs.parameters.device}}']
+      image: kaejong/train:0.2
+      resources:
+        limits: {nvidia.com/gpu: 4}
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+    inputs:
+      parameters:
+      - {name: device}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: workspace-dandc-v1}
+  arguments:
+    parameters:
+    - {name: mode_hyp_train_test}
+    - {name: preprocess_yes_no}
+    - {name: model_path}
+    - {name: device}
+  serviceAccountName: pipeline-runner

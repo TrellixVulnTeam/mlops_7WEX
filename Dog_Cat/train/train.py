@@ -5,8 +5,9 @@ import torch
 import torch.nn as nn
 import timm
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from mlflow.pytorch import save_model
+from mlflow.tracking.client import MlflowClient
 from util import seed_everything, MetricMonitor, build_dataset, build_optimizer
-import wandb
 class ConvNeXt(nn.Module):
     def __init__(self, num_classes, pretrained=True):
         super(ConvNeXt, self).__init__()
@@ -32,18 +33,15 @@ def train_epoch(train_loader, epoch, model, optimizer, criterion, device):
         stream.set_description(
             f"Epoch: {epoch}. Train. {metric_monitor}"
         )
-        wandb.log({"Train Epoch": epoch, "Train loss": loss.item(), "Train accuracy": accuracy})
 def val_epoch(val_loader, epoch, model, criterion, device):
     metric_monitor = MetricMonitor()
     model.eval()
     stream = tqdm(val_loader)
-    val_loss = 0
     with torch.no_grad():
         for i, (images, targets) in enumerate(stream, start=1):
             images, targets = images.float().to(device), targets.to(device)
             output = model(images)
             loss = criterion(output, targets)
-            val_loss += loss
             predicted = torch.argmax(output, dim=1)
             accuracy = round((targets == predicted).sum().item() / targets.shape[0] * 100, 2)
             metric_monitor.update('Loss', loss.item())
@@ -51,12 +49,11 @@ def val_epoch(val_loader, epoch, model, criterion, device):
             stream.set_description(
                 f"Epoch: {epoch}. Validation. {metric_monitor}"
             )
-            wandb.log({"Validation Epoch":epoch, "Validation loss": loss.item(), "Validation accuracy": accuracy})
-        wandb.log({"VAL EPOCH LOSS": val_loss / len(val_loader.dataset)})
     return accuracy
-def main(hyperparameters=None):
-    wandb.init(project='surface-classification', config=hyperparameters)
-    config = wandb.config
+def main(opt, device):
+    batch_size = 128
+    optimizer = 'sgd'
+    learning_rate = 0.001
     epochs = 1
     # read mean std values
     with open(f'{opt.data_path}/mean-std.txt', 'r') as f:
@@ -64,31 +61,47 @@ def main(hyperparameters=None):
         mean_std = list(map(lambda x: x.strip('\n'), cc))
     model = ConvNeXt(num_classes=2, pretrained=True)
     model.to(device)
-    train_loader, val_loader, _ = build_dataset(opt.data_path, config.img_size, config.batch_size, mean_std)
-    optimizer = build_optimizer(model, config.optimizer, config.lr)
+    train_loader, val_loader, _ = build_dataset(opt.data_path, opt.img_size, batch_size, mean_std)
+    optimizer = build_optimizer(model, optimizer, learning_rate)
     criterion = nn.CrossEntropyLoss()
     scheduler = CosineAnnealingLR(optimizer, T_max=10,
                                   eta_min=1e-6,
                                   last_epoch=-1)
+    best_accuracy = 0
     for epoch in range(1, epochs + 1):
         train_epoch(train_loader, epoch, model, optimizer, criterion, device)
-        val_epoch(val_loader, epoch, model, criterion, device)
+        accuracy = val_epoch(val_loader, epoch, model, criterion, device)
         scheduler.step()
-def configure():
-    sweep_config = \
-    {'method': 'random',
-     'metric': {'goal': 'minimize', 'name': 'VAL EPOCH LOSS'},
-     'parameters': {'batch_size': {'values': [32, 64, 128]},
-                    'epochs': {'value': 1},
-                    'img_size': {'values': [112, 224]},
-                    'lr': {'distribution': 'uniform',
-                                      'max': 0.1,
-                                      'min': 0.001},
-                    'optimizer': {'values': ['adam', 'sgd']}}}
-    return sweep_config
+        if accuracy > best_accuracy:
+            os.makedirs(f'{opt.data_path}/weight', exist_ok=True)
+            torch.save(model.state_dict(), f'{opt.data_path}/weight/best.pth')
+            best_accuracy = accuracy
+
+def upload_model_to_mlflow(opt, device):
+
+
+    os.environ["MLFLOW_S3_ENDPOINT_URL"] = "http://minio-service.kubeflow.svc:9000"
+    os.environ["AWS_ACCESS_KEY_ID"] = "minio"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
+
+    client = MlflowClient("http://mlflow-server-service.mlflow-system.svc:5000")
+    model = ConvNeXt(num_classes=2, pretrained=False)
+    model.load_state_dict(torch.load(f'{opt.data_path}/weight/best.pth', map_location=device))
+    conda_env = {'name': 'mlflow-env', 'channels': ['conda-forge'],
+     'dependencies': ['python=3.9.4', 'pip', {'pip': ['mlflow', 'torch==1.8.0', 'cloudpickle==2.0.0']}]}
+    save_model(
+        pytorch_model=model,
+        path=opt.model_name,
+        conda_env=conda_env,
+    )
+    tags = {"DeepLearning": "dandc classification"}
+    run = client.create_run(experiment_id="2", tags=tags)
+    client.log_artifact(run.info.run_id, opt.model_name)
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data-path', type=str, help='dataset root path')
+    parser.add_argument('--img-size', type=int, help='resize img size')
+    parser.add_argument('--model-name', type=str, help='model name for artifact path')
     parser.add_argument('--device', type=str, help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     opt = parser.parse_args()
     if opt.device == 'cpu':
@@ -98,7 +111,5 @@ if __name__ == '__main__':
         device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"DEVICE is {device}")
     seed_everything()
-    wandb.login(key='write private key')
-    hyperparameters = configure()
-    sweep_id = wandb.sweep(hyperparameters, project='surface-classification')
-    wandb.agent(sweep_id, main, count=10)  # count: 실험 횟수
+    main(opt, device)
+    upload_model_to_mlflow(opt, device)

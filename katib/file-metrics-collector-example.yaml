@@ -1,0 +1,82 @@
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  namespace: kubeflow-user-example-com
+  name: file-metrics-collector
+spec:
+  objective:
+    type: maximize
+    goal: 0.99
+    objectiveMetricName: accuracy
+    additionalMetricNames:
+      - loss
+  # 이 부분이 추가되었습니다.
+  metricsCollectorSpec:
+    # Metrics collector 의 type 을 지정할 수 있습니다.
+    # Default 는 StdOut 이며, File, TesnroflowEvent 등을 지원합니다.
+    # 자세한 내용은 다음 페이지를 참고하시기 바랍니다.
+    # https://www.kubeflow.org/docs/components/katib/experiment/#metrics-collector
+
+    # 이번 예제에서는 File 타입을 사용해봅니다.
+    collector:
+      kind: File
+    # File Metrics Collector 가 Metrics 를 어떻게 가져올 것인지를 정의하는 부분입니다.
+    source:
+      # metrics 를 어느 경로에서 가져올 것인지를 작성합니다.
+      # 각 Trial 에서는 반드시 해당 경로에 metrics 를 저장해야 정상적으로 parsing 할 수 있습니다.
+      fileSystemPath:
+        path: "/katib/mnist.log"
+        kind: File
+      filter:
+        # 해당 파일에서 어떤 format 을 metrics name 과 metrics value 로 인식하고 parsing 해올 것인지를 정의합니다.
+        metricsFormat:
+          - "{metricName: ([\\w|-]+), metricValue: ((-?\\d+)(\\.\\d+)?)}"
+      
+
+  algorithm:
+    algorithmName: random
+  parallelTrialCount: 1
+  maxTrialCount: 1
+  maxFailedTrialCount: 1
+  parameters:
+    - name: lr
+      parameterType: double
+      feasibleSpace:
+        min: "0.01"
+        max: "0.03"
+    - name: momentum
+      parameterType: double
+      feasibleSpace:
+        min: "0.3"
+        max: "0.7"
+  trialTemplate:
+    primaryContainerName: training-container
+    trialParameters:
+      - name: learningRate
+        description: Learning rate for the training model
+        reference: lr
+      - name: momentum
+        description: Momentum for the training model
+        reference: momentum
+    trialSpec:
+      apiVersion: batch/v1
+      kind: Job
+      spec:
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: 'false'
+          spec:
+            containers:
+              - name: training-container
+                # 해당 이미지의 Dockerfile 과 src code 는 다음 페이지에서 확인할 수 있습니다.
+                # https://github.com/kubeflow/katib/tree/983a867/examples/v1beta1/trial-images/pytorch-mnist
+                image: docker.io/kubeflowkatib/pytorch-mnist:v1beta1-45c5727
+                command:
+                  - "python3"
+                  - "/opt/pytorch-mnist/mnist.py"
+                  - "--log-path=/katib/mnist.log"
+                  - "--lr=${trialParameters.learningRate}"
+                  - "--momentum=${trialParameters.momentum}"
+                  - "--epochs=1"
+            restartPolicy: Never

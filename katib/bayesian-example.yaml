@@ -1,0 +1,79 @@
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  namespace: kubeflow-user-example-com
+  name: bayesian-optimization
+spec:
+  objective:
+    type: maximize
+    goal: 0.99
+    objectiveMetricName: Validation-accuracy
+
+  algorithm:
+    algorithmName: bayesianoptimization
+    # 아래 부분이 추가된 것을 확인할 수 있습니다.
+    # algorithmSetting 에서 지원하는 key-value 는 알고리즘마다 다르며,
+    # 각 알고리즘에서 지원하는 algorithmSetting 은 다음 페이지에서 확인할 수 있습니다.
+    # https://www.kubeflow.org/docs/components/katib/experiment/#search-algorithms-in-detail
+
+    # bayesian optimization 에서 지원하는 algorithmSetting 은 다음 페이지에서 확인할 수 있습니다.
+    # https://www.kubeflow.org/docs/components/katib/experiment/#bayesian-optimization
+    # 지정하지 않은 value 는 Default value 로 설정됩니다.
+    algorithmSettings:
+      - name: "random_state" # random seeed
+        value: "1234"
+      - name: "n_initial_points" # 근사를 위한 inital point 의 개수
+        value: "5"
+  parallelTrialCount: 1
+  maxTrialCount: 1
+  maxFailedTrialCount: 1
+  parameters:
+    - name: lr
+      parameterType: double
+      feasibleSpace:
+        min: "0.001"
+        max: "0.05"
+    - name: num-layers
+      parameterType: int
+      feasibleSpace:
+        min: "2"
+        max: "7"
+    - name: optimizer
+      parameterType: categorical
+      feasibleSpace:
+        list:
+          - sgd
+          - adam
+  trialTemplate:
+    primaryContainerName: training-container
+    trialParameters:
+      - name: learningRate
+        description: Learning rate for the training model
+        reference: lr
+      - name: numberLayers
+        description: Number of training model layers
+        reference: num-layers
+      - name: optimizer
+        description: Training model optimizer (sdg, adam or ftrl)
+        reference: optimizer
+    trialSpec:
+      apiVersion: batch/v1
+      kind: Job
+      spec:
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: 'false'
+          spec:
+            containers:
+              - name: training-container
+                image: docker.io/kubeflowkatib/mxnet-mnist:v1beta1-45c5727
+                command:
+                  - "python3"
+                  - "/opt/mxnet-mnist/mnist.py"
+                  - "--batch-size=64"
+                  - "--lr=${trialParameters.learningRate}"
+                  - "--num-layers=${trialParameters.numberLayers}"
+                  - "--optimizer=${trialParameters.optimizer}"
+                  - "--num-epochs=1" # 성능이 개선되는 걸 확인하고 싶다면 이 값을 변경해주세요.
+            restartPolicy: Never

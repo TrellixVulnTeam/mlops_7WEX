@@ -22,10 +22,13 @@ def test(test_loader, model, criterion, device):
                 f"Test. {metric_monitor}"
             )
 def main(opt, device):
-    mlflow.set_tracking_uri("http://mlflow-server-service.mlflow-system.svc:5000")
+
+    mlflow.set_tracking_uri("http://210.123.42.43:5000")
+
     os.environ["MLFLOW_S3_ENDPOINT_URL"] = "http://minio-service.kubeflow.svc:9000"
     os.environ["AWS_ACCESS_KEY_ID"] = "minio"
     os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
+
     batch_size = 64
     with open(f'{opt.data_path}/mean-std.txt', 'r') as f:
         cc = f.readlines()
