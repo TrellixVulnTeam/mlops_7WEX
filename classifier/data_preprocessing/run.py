@@ -122,7 +122,6 @@ if __name__ == "__main__":
     parser.add_argument('--valid_ratio', type=float, default=0.1)
     parser.add_argument('--test_ratio', type=float, default=0.1)
 
-
     args = parser.parse_args()
 
     print("Data Read...")
