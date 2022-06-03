@@ -1,0 +1,4 @@
+numpy==1.19.4
+faiss-cpu==1.6.1
+ujson
+

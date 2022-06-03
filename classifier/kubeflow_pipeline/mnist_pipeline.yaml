@@ -1,0 +1,169 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: mnist-using-arcface-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.9, pipelines.kubeflow.org/pipeline_compilation_time: '2022-04-07T23:52:04.240031',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "CT pipeline", "name":
+      "MNIST using Arcface"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.9}
+spec:
+  entrypoint: mnist-using-arcface
+  templates:
+  - name: analysis-total
+    container:
+      env:
+      - {name: MANAGE_URL, value: 'http://210.123.42.43:8080/send'}
+      image: kaejong/mnist-analysis:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+      - {mountPath: /home/jovyan, name: train-model}
+    outputs:
+      parameters:
+      - name: analysis-total-accuracy
+        valueFrom: {path: /accuracy.json}
+      artifacts:
+      - {name: mlpipeline-ui-metadata, path: /mlpipeline-ui-metadata.json}
+      - {name: mlpipeline-metrics, path: /mlpipeline-metrics.json}
+      - {name: analysis-total-accuracy, path: /accuracy.json}
+      - {name: analysis-total-confusion_matrix, path: /confusion_matrix.csv}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: analysis}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: data}
+    - name: train-model
+      persistentVolumeClaim: {claimName: train-model-pvc}
+  - name: condition-1
+    dag:
+      tasks:
+      - {name: deploy-mar, template: deploy-mar}
+  - name: deploy-mar
+    container:
+      env:
+      - {name: MANAGE_URL, value: 'http://210.123.42.43:8080/send'}
+      image: kaejong/mnist-deploy:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: train-model}
+      - {mountPath: /home/jovyan, name: deploy-model}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: deploy}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: deploy-model
+      persistentVolumeClaim: {claimName: deploy-model-pvc}
+    - name: train-model
+      persistentVolumeClaim: {claimName: train-model-pvc}
+  - name: embedding-data-using-embedding-model
+    container:
+      image: kaejong/mnist-embedding:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+      - {mountPath: /home/jovyan, name: train-model}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: embedding}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: data}
+    - name: train-model
+      persistentVolumeClaim: {claimName: train-model-pvc}
+  - name: load-preprocess-data-pipeline
+    container:
+      image: kaejong/mnist-pre-data:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: collect & preprocess
+          data}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: data}
+  - name: mnist-using-arcface
+    dag:
+      tasks:
+      - name: analysis-total
+        template: analysis-total
+        dependencies: [train-faiss]
+      - name: condition-1
+        template: condition-1
+        when: '{{tasks.analysis-total.outputs.parameters.analysis-total-accuracy}}
+          > 0.8'
+        dependencies: [analysis-total]
+      - name: embedding-data-using-embedding-model
+        template: embedding-data-using-embedding-model
+        dependencies: [train-embedding-model]
+      - {name: load-preprocess-data-pipeline, template: load-preprocess-data-pipeline}
+      - name: train-embedding-model
+        template: train-embedding-model
+        dependencies: [validate-data-pipeline]
+      - name: train-faiss
+        template: train-faiss
+        dependencies: [embedding-data-using-embedding-model]
+      - name: validate-data-pipeline
+        template: validate-data-pipeline
+        dependencies: [load-preprocess-data-pipeline]
+  - name: train-embedding-model
+    container:
+      image: kaejong/mnist-train-model:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+      - {mountPath: /home/jovyan, name: train-model}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: train model}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: data}
+    - name: train-model
+      persistentVolumeClaim: {claimName: train-model-pvc}
+  - name: train-faiss
+    container:
+      image: kaejong/mnist-train-faiss:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+      - {mountPath: /home/jovyan, name: train-model}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: train faiss}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: data}
+    - name: train-model
+      persistentVolumeClaim: {claimName: train-model-pvc}
+  - name: validate-data-pipeline
+    container:
+      image: kaejong/mnist-val-data:latest
+      volumeMounts:
+      - {mountPath: /home/jovyan, name: pipeline}
+    metadata:
+      annotations: {pipelines.kubeflow.org/task_display_name: validate data}
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.9
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "true"
+    volumes:
+    - name: pipeline
+      persistentVolumeClaim: {claimName: data}
+  arguments:
+    parameters: []
+  serviceAccountName: pipeline-runner
