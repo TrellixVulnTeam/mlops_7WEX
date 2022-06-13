@@ -1,0 +1,15 @@
+artifact_uri: file:///home/jongjin/st/mlops/mlflow/sklearn_elasticnet_wine/mlruns/0/433c4b8c84e348809f9815aebdbe0d30/artifacts
+end_time: 1654876190829
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 433c4b8c84e348809f9815aebdbe0d30
+run_uuid: 433c4b8c84e348809f9815aebdbe0d30
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1654876188474
+status: 3
+tags: []
+user_id: jongjin
