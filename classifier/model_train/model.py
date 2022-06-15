@@ -5,6 +5,29 @@ import torch.nn.functional as F
 from torchvision import models
 from pathlib import Path
 
+class VGG(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        self.layer1 = nn.Conv2d(in_channels, 64)
+        self.layer2 = nn.Conv2d(64, 64)
+        self.layer3 = nn.Conv2d(64, 128)
+        self.layer4 = nn.Conv2d(128, 256)
+        self.layer5 = nn.Conv2d(256, 512)
+        self.layer6 = nn.Conv2d(512, 512)
+        self.pooling = nn.MaxPool2d(stride=2)
+        self.classifier = nn.Linear()
+
+    def forward(x):
+        x = self.layer1(x)
+        out = self.classifier(x)
+        return out
+
+
+
+
+
+
+
+
 
 class BasicBlock(nn.Module):
     expansion = 1

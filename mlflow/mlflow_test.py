@@ -2,11 +2,10 @@ import mlflow
 mlflow.set_tracking_uri("http://210.123.42.41:5000")
 
 client = mlflow.tracking.MlflowClient("http://210.123.42.41:5000")
-experiment = client.get_experiment_by_name("classification")
 
-exp = mlflow.get_experiment_by_name("Classificationa")
+exp = mlflow.get_experiment_by_name("Classification")
 if exp is None:
-    exp_id = mlflow.create_experiment("Classificationa")
+    exp_id = mlflow.create_experiment("Classification")
 else:
     exp_id = exp.experiment_id
 
