@@ -89,7 +89,7 @@ def data_processing(data_lst, args):
             print('No Processing .. Check Data ! Path : {data:s}'.format(num=i+1, data=data))
 
     df = pd.DataFrame(df_lst, columns=["img_path", "Class"])
-    df = data_split(df, train_ratio=args.train_ratio, valida_ratio=args.valida_ratio, test_ratio=args.test_ratio)
+    df = data_split(df, train_ratio=args.train_ratio, valid_ratio=args.valid_ratio, test_ratio=args.test_ratio)
 
     df.to_csv(os.path.join(args.output_dir, (args.data_name+'.csv')))
 
@@ -100,10 +100,10 @@ def data_processing(data_lst, args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--data_path', type=str, default="/home/jongjin/st/dataset/animals")
+    parser.add_argument('--data_path', type=str, default="/home/jongjin/workspace/datasets/animals")
     parser.add_argument('--image_width', type=int, default=224)
     parser.add_argument('--image_height', type=int, default=224)
-    parser.add_argument('--output_dir', type=str, default="/home/jongjin/st/dataset/animals_resize")
+    parser.add_argument('--output_dir', type=str, default="/home/jongjin/workspace/datasets/animals_resize")
     parser.add_argument('--train_ratio', type=float, default=0.8)
     parser.add_argument('--valid_ratio', type=float, default=0.1)
     parser.add_argument('--test_ratio', type=float, default=0.1)
