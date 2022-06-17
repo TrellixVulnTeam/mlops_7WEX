@@ -1,7 +1,3 @@
-# The data set used in this example is from http://archive.ics.uci.edu/ml/datasets/Wine+Quality
-# P. Cortez, A. Cerdeira, F. Almeida, T. Matos and J. Reis.
-# Modeling wine preferences by data mining from physicochemical properties. In Decision Support Systems, Elsevier, 47(4):547-553, 2009.
-
 import os
 import warnings
 import sys
@@ -55,9 +51,13 @@ if __name__ == "__main__":
     alpha = float(sys.argv[1]) if len(sys.argv) > 1 else 0.5
     l1_ratio = float(sys.argv[2]) if len(sys.argv) > 2 else 0.5
 
-    remote_server_uri = "http://210.123.42.41:5000" # set to your server URI
+    remote_server_uri = "http://0.0.0.0:5000" # set to your server URI
     mlflow.set_tracking_uri(remote_server_uri)
+    os.environ["MLFLOW_S3_ENDPOINT_URL"] = "http://0.0.0.0:9090"
+    os.environ["AWS_ACCESS_KEY_ID"] = "minio"
+    os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
     mlflow.set_experiment("testing12345")
+
 
     with mlflow.start_run():
         lr = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42)
