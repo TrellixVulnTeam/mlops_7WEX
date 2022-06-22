@@ -1,0 +1,3 @@
+[console_scripts]
+bentoml = bentoml:commandline_interface
+

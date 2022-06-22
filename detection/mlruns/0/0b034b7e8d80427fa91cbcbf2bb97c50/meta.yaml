@@ -1,0 +1,15 @@
+artifact_uri: file:///home/jongjin/st/mlops/detection/mlruns/0/0b034b7e8d80427fa91cbcbf2bb97c50/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 0b034b7e8d80427fa91cbcbf2bb97c50
+run_uuid: 0b034b7e8d80427fa91cbcbf2bb97c50
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1655906182612
+status: 1
+tags: []
+user_id: jongjin

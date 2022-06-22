@@ -41,7 +41,7 @@ class LoadImagesAndLabels(Dataset):
         self.img_size = img_size
         self.mode = mode
         df = pd.read_csv(data_path)
-        self.classes = list(set(df.Class))
+        self.classes = sorted(list(set(df.Class)))
         self.df = df[df['type']==mode]
 
 

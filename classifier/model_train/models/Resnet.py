@@ -63,7 +63,7 @@ class ResNet(nn.Module):
             for j in range(n):
                 stride = 2 if (j==0 and i!=0) else 1
                 residual += [ResBlock(block_feat[i], block_feat[i], kernel_size=3, stride=stride, padding=1, bias=True, norm='batchnorm', act='relu')]
-            
+
         self.res = nn.Sequential(*residual)
 
         # self.layer2 = ConvModule(block_feat[-1], block_feat[-1], kernel_size=3, stride=1, padding=1, bias=True, norm='batchnorm', act='relu')
