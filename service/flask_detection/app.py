@@ -8,86 +8,94 @@ import albumentations as A
 import albumentations.pytorch
 # from keras.models import load_model
 # from keras.preprocessing import image
+from torch.autograd import Variable
+import torch.nn.functional as F
+import numpy as np
+import matplotlib.pyplot as plt
+from yolo.utils.utils import *
+
+
 
 app = Flask(__name__)
 
-dic = {0 : 'Cat', 1 : 'Dog', 2 : 'Panda'}
-
 model_name = 'detection'
-version=1
+version=2
 os.environ["MLFLOW_S3_ENDPOINT_URL"] = "http://0.0.0.0:9090"
 os.environ["AWS_ACCESS_KEY_ID"] = "minio"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
 client = MlflowClient("http://0.0.0.0:5000")
 
 filter_string = "name='{}'".format(model_name)
-
 results=client.search_model_versions(filter_string)
-
 for res in results:
     if res.version == str(version):
         model_uri = res.source
         break
-
 model = mlflow.pytorch.load_model(model_uri)
-print(model)
-# transform_lst = []
-# transform_lst += [A.Resize(224,224)]
-# transform_lst += [A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], always_apply=True)]
-# transform_lst += [A.pytorch.ToTensorV2()]
-# transforms = albumentations.Compose(transform_lst)
 
+classes = load_classes("/home/jongjin/st/mlops/service/flask_detection/yolo/df2cfg/df2.names")
 
-# def inference(path, model):
-    # img = cv2.imread(path)
-    # img = transforms(image=img)['image']
-
-    # # img = torch.from_numpy(path).float()
-
-    # img = img.unsqueeze(0) # (H, W, C) -> (C, H, W) -> (1, C, H, W)
-    # print(img.shape)
-
-    # model = model.cuda()
-    # img = img.cuda()
-
-    # outputs = model(img)
-
-    # out = torch.argmax(outputs, dim=1).tolist()
-    # print(out)
-    # return dic[out[0]]
+cmap = plt.get_cmap("rainbow")
+colors = np.array([cmap(i) for i in np.linspace(0, 1, 13)])
 
 
 
-# # routes
-# @app.route("/", methods=['GET', 'POST'])
-# def main():
-    # return render_template("index.html")
+path = '/home/jongjin/st/vvx.jpeg'
+def inference(path, model):
+    img = cv2.imread(path)
+    dets = get_detections(img, model)
 
-# @app.route("/about")
-# def about_page():
-    # return "Please subscribe Artificial Intelligence Hub..!!!"
+    if len(dets) != 0 :
+            dets.sort(reverse=False ,key = lambda x:x[4])
+            for x1, y1, x2, y2, cls_conf, cls_pred in dets:
+                    print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf))
 
-# @app.route("/submit", methods = ['GET', 'POST'])
-# def get_output():
-    # if request.method == 'POST':
-        # img = request.files['my_image']
-        # print(img)
+                    color = colors[int(cls_pred)]
 
-        # img_path = "static/" + img.filename
-        # if img_path =='static/':
-            # return 404
+                    color = tuple(c*255 for c in color)
+                    color = (.7*color[2],.7*color[1],.7*color[0])
 
-        # print("Image Save ! ! ", img_path)
-        # img.save(img_path)
-        # p = inference(img_path, model)
+                    font = cv2.FONT_HERSHEY_SIMPLEX
 
 
-    # return render_template("index.html", prediction = p, img_path = img_path)
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    text =  "%s conf: %.3f" % (classes[int(cls_pred)] ,cls_conf)
+
+                    cv2.rectangle(img,(x1,y1) , (x2,y2) , color,3)
+                    y1 = 0 if y1<0 else y1
+                    y1_rect = y1-25
+                    y1_text = y1-5
+
+                    if y1_rect<0:
+                        y1_rect = y1+27
+                        y1_text = y1+20
+                    cv2.rectangle(img,(x1-2,y1_rect) , (x1 + int(8.5*len(text)),y1) , color,-1)
+                    cv2.putText(img,text,(x1,y1_text), font, 0.5,(255,255,255),1,cv2.LINE_AA)
+            cv2.imwrite('/home/jongjin/st/mlops/service/flask_detection/static/ouput-test_{}_{}.jpg'.format('yolov3', '1'),img)
+inference(path, model)
+
+# routes
+@app.route("/", methods=['GET', 'POST'])
+def main():
+    return render_template("index.html")
+
+@app.route("/about")
+def about_page():
+    return "Please subscribe Artificial Intelligence Hub..!!!"
+
+@app.route("/submit", methods = ['GET', 'POST'])
+def get_output():
+    if request.method == 'POST':
+        img = request.files['my_image']
+        print(img)
+
+        img_path = "static/" + img.filename
+        if img_path =='static/':
+            return 404
+
+        print("Image Save ! ! ", img_path)
+        img.save(img_path)
+        p = inference(img_path, model)
 
 
-
-
-
-
-# if __name__ =='__main__':
-	# app.run(host='0.0.0.0', port=5001, debug=True)
+    return render_template("index.html", prediction = p, img_path = img_path)

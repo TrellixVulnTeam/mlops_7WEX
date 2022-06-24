@@ -11,17 +11,6 @@ import albumentations.pytorch
 
 app = Flask(__name__)
 
-dic = {0 : 'Cat', 1 : 'Dog', 2 : 'Panda'}
-
-# model = load_model('model.h5')
-# model.make_predict_function()
-
-# def predict_label(img_path):
-    # i = image.load_img(img_path, target_size=(100,100))
-    # i = image.img_to_array(i)/255.0
-    # i = i.reshape(1, 100,100,3)
-    # p = model.predict_classes(i)
-    # return dic[p[0]]
 
 model_name = 'Animals'
 version=5
@@ -31,15 +20,15 @@ os.environ["AWS_SECRET_ACCESS_KEY"] = "minio123"
 client = MlflowClient("http://0.0.0.0:5000")
 
 filter_string = "name='{}'".format(model_name)
-
 results=client.search_model_versions(filter_string)
-
 for res in results:
     if res.version == str(version):
         model_uri = res.source
         break
-
 model = mlflow.pytorch.load_model(model_uri)
+
+classes = {0 : 'Cat', 1 : 'Dog', 2 : 'Panda'}
+
 transform_lst = []
 transform_lst += [A.Resize(224,224)]
 transform_lst += [A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], always_apply=True)]
@@ -63,7 +52,7 @@ def inference(path, model):
 
     out = torch.argmax(outputs, dim=1).tolist()
     print(out)
-    return dic[out[0]]
+    return classes[out[0]]
 
 
 
