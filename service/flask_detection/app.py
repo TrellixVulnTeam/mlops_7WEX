@@ -40,7 +40,7 @@ colors = np.array([cmap(i) for i in np.linspace(0, 1, 13)])
 
 
 
-path = '/home/jongjin/st/vvx.jpeg'
+path = '/home/jongjin/st/asdf.jpeg'
 def inference(path, model):
     img = cv2.imread(path)
     dets = get_detections(img, model)
