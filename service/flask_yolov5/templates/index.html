@@ -12,8 +12,8 @@
 <body>
 
 <div class="container">
-  <h1 class="jumbotron bg-primary">이미지 분류기</h1>
-  <br><strong>dsadjaskldj</strong><br>
+  <h1 class="jumbotron bg-primary">Fashion Item Detector</h1>
+  <br><br>
   <form class="form-horizontal" action="/submit" method="post" enctype="multipart/form-data">
 
     <div class="form-group">
@@ -31,10 +31,8 @@
   </form>
 
 	{% if prediction %}
-  <img src="{{source_path}}" height="400px" width="400px">
-	<h2> Your Prediction   : <i> {{prediction}} </i></h2>
-  <img src="{{dst_path}}" height="400px" width="400px">
-	<h2> Your Prediction   : <i> {{prediction}} </i></h2>
+  <img src="{{img_path}}" height="500px" width="500px">
+  <img src="{{dst_path}}" height="500px" width="500px">
 	{% endif %}
 
 </div>

@@ -6,8 +6,6 @@ from mlflow.tracking import MlflowClient
 import cv2
 import albumentations as A
 import albumentations.pytorch
-# from keras.models import load_model
-# from keras.preprocessing import image
 
 app = Flask(__name__)
 
